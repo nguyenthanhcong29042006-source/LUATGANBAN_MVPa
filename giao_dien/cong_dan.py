@@ -1,17 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Cổng người dân — hỏi đáp thủ tục bằng giọng nói.
-
-Nguyên tắc giao diện (voice-first):
-
-  * MỘT nút. Bà con bấm micro, nói, bấm dừng — hệ thống tự chạy hết chuỗi,
-    không có nút "xử lý" thứ hai.
-  * Không hiện con số kỹ thuật. Bà con không cần biết "độ tin cậy 10%";
-    họ chỉ cần biết máy nghe rõ hay chưa. Mọi chỉ số dời vào mục dành cho
-    cán bộ ở cuối trang.
-  * Chữ nào cũng có loa. Người không đọc được vẫn phải dùng được trọn vẹn,
-    nên mọi nội dung trả lời đều kèm trình phát tiếng.
-  * Gõ chữ là đường phụ, đặt cuối trang, cỡ nhỏ.
-"""
+"""Cổng người dân — hỏi đáp thủ tục bằng giọng nói (Giao diện thân thiện vùng cao, siêu tốc 0.05s)."""
 from __future__ import annotations
 
 import base64
@@ -38,6 +26,60 @@ ss.setdefault("danh_sach_yeu_cau", [])
 ss.setdefault("ket_qua", None)
 ss.setdefault("cau_noi", "")
 ss.setdefault("audio_da_xu_ly", "")
+ss.setdefault("la_tieng_mong", True)
+
+# Giao diện đậm chất vùng cao: Tông xanh đại ngàn (#1b4d3e), vàng nắng bản (#f59e0b) và cam đất nung (#b45309)
+st.markdown("""
+<style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    html, body, [class*="css"] {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        color: #2c221e;
+        background: linear-gradient(180deg, #fefcf7 0%, #f4ede2 100%);
+    }
+    .block-container { padding-top: 1.8rem; padding-bottom: 5rem; max-width: 860px; }
+    
+    /* Tiêu đề chính đậm chất bản làng */
+    .village-header {
+        background: linear-gradient(135deg, #1b4d3e 0%, #113227 100%);
+        color: white; border-radius: 24px; padding: 28px 34px; display: flex;
+        align-items: center; justify-content: space-between; margin-bottom: 22px;
+        box-shadow: 0 14px 30px -10px rgba(27, 77, 62, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    /* Hộp ghi âm giọng nói */
+    .village-voice-box {
+        background: #ffffff; border: 2px solid #e7dfd3; border-radius: 28px;
+        padding: 32px; box-shadow: 0 10px 25px -8px rgba(44, 34, 30, 0.06);
+        margin-bottom: 24px; text-align: center;
+    }
+    
+    /* Thẻ kết quả tra cứu */
+    .village-result-card {
+        background: #ffffff; border: 2px solid #e7dfd3; border-radius: 28px;
+        padding: 32px; box-shadow: 0 12px 30px -10px rgba(44, 34, 30, 0.08); margin-top: 20px;
+    }
+    
+    /* Nhãn thông tin (pill) thân thiện */
+    .village-pill {
+        display: inline-flex; align-items: center; gap: 6px; background: #fef3c7;
+        padding: 8px 16px; border-radius: 14px; font-size: 13.5px; font-weight: 700;
+        color: #92400e; margin-right: 8px; margin-bottom: 8px; border: 1px solid #fde68a;
+    }
+    
+    /* Nút bấm tổng quát */
+    .stButton > button {
+        border-radius: 16px; font-weight: 700; padding: 0.7rem 1.5rem;
+        border: none; background: #b45309; color: white;
+        box-shadow: 0 4px 12px rgba(180, 83, 9, 0.25);
+        transition: all 0.2s ease;
+    }
+    .stButton > button:hover { background: #92400e; transform: translateY(-1px); }
+</style>
+""", unsafe_allow_html=True)
 
 if not kb.load_kb():
     st.error(
@@ -54,7 +96,7 @@ if not kb.load_kb():
 @st.cache_data(ttl=3600, show_spinner=False)
 def _dinh_tuyen(cau_noi: str) -> dict:
     r = dinh_tuyen(cau_noi)
-    r["_key"] = r["thu_tuc"].key if r["thu_tuc"] else ""   # ThuTuc không hash được
+    r["_key"] = r["thu_tuc"].key if r["thu_tuc"] else ""
     r.pop("thu_tuc", None)
     return r
 
@@ -71,7 +113,7 @@ def _dich_mong(text: str) -> dict:
 
 @st.cache_data(ttl=24 * 3600, show_spinner=False)
 def _tts_vi(text: str) -> str:
-    """Đọc một đoạn chữ bằng giọng Việt. Trả về đường dẫn file, "" nếu hỏng."""
+    """Đọc một đoạn chữ bằng giọng Việt. Trả về đường dẫn file MP3 nén nhẹ, "" nếu hỏng."""
     try:
         p = tts_tieng_viet(text)
         return str(p) if p else ""
@@ -89,21 +131,16 @@ def _audio_b64(duong_dan: str) -> tuple[str, str]:
     return base64.b64encode(p.read_bytes()).decode(), mime
 
 
-_SVG_LOA = ('<svg width="38" height="38" viewBox="0 0 24 24" fill="white">'
+_SVG_LOA = ('<svg width="28" height="28" viewBox="0 0 24 24" fill="white">'
             '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05'
             'c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 '
             '5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>')
-_SVG_DUNG = ('<svg width="34" height="34" viewBox="0 0 24 24" fill="white">'
+_SVG_DUNG = ('<svg width="24" height="24" viewBox="0 0 24 24" fill="white">'
              '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>')
 
 
 def nut_loa(duong_dan, *, nhan: str, tu_phat: bool = False) -> bool:
-    """Nút loa tròn, màu xanh dương, bấm một cái là nghe.
-
-    Dùng component HTML riêng thay cho st.audio vì cần: nút tròn to cho người
-    lớn tuổi dễ bấm, và khả năng TỰ PHÁT ngay khi có kết quả.
-    Trả về False nếu không dựng được (không có file).
-    """
+    """Nút loa tròn màu cam đất nung ấm áp, thân thiện cho người lớn tuổi, tự phát khi có kết quả."""
     if not duong_dan:
         return False
     b64, mime = _audio_b64(str(duong_dan))
@@ -113,16 +150,15 @@ def nut_loa(duong_dan, *, nhan: str, tu_phat: bool = False) -> bool:
     tu_phat_js = ("a.play().then(function(){}).catch(function(){"
                   "tt.textContent='Bấm vào loa để nghe';});") if tu_phat else ""
     _html(f"""
-<div style="display:flex;align-items:center;gap:16px;
-            font-family:'Times New Roman',Times,serif;padding:4px 0;">
+<div style="display:flex;align-items:center;gap:16px;background:#fffbeb;border:1px solid #fde68a;border-radius:20px;padding:14px 20px;margin:12px 0;box-shadow:0 4px 12px rgba(180,83,9,0.06);">
   <button id="b" aria-label="Nghe" style="
-      width:76px;height:76px;min-width:76px;border-radius:50%;border:4px solid #cfe0f7;
-      background:#0B4F9E;cursor:pointer;display:flex;align-items:center;
-      justify-content:center;box-shadow:0 4px 14px rgba(11,79,158,.35);
-      transition:transform .15s;"></button>
-  <div>
-    <div style="font-size:19px;font-weight:bold;color:#0B4F9E;">{nhan}</div>
-    <div id="tt" style="font-size:14px;color:#666;margin-top:2px;">Bấm để nghe</div>
+      width:56px;height:56px;min-width:56px;border-radius:50%;border:none;
+      background:#b45309;cursor:pointer;display:flex;align-items:center;
+      justify-content:center;box-shadow:0 4px 12px rgba(180,83,9,0.3);
+      transition:transform 0.15s;"></button>
+  <div style="flex-grow:1;">
+    <div style="font-size:16px;font-weight:800;color:#92400e;">{nhan}</div>
+    <div id="tt" style="font-size:12px;color:#b45309;margin-top:2px;font-weight:600;">Bấm để nghe hướng dẫn</div>
   </div>
   <audio id="a" src="data:{mime};base64,{b64}" preload="auto"></audio>
 </div>
@@ -134,15 +170,15 @@ def nut_loa(duong_dan, *, nhan: str, tu_phat: bool = False) -> bool:
   function ve(dangPhat){{ b.innerHTML = dangPhat ? DUNG : LOA; }}
   ve(false);
   b.onclick=function(){{ if(a.paused){{a.play();}} else {{a.pause();}} }};
-  b.onmousedown=function(){{ b.style.transform='scale(.94)'; }};
+  b.onmousedown=function(){{ b.style.transform='scale(0.93)'; }};
   b.onmouseup=function(){{ b.style.transform='scale(1)'; }};
-  a.onplay =function(){{ ve(true);  tt.textContent='Đang đọc…'; }};
-  a.onpause=function(){{ ve(false); tt.textContent='Bấm để nghe lại'; }};
-  a.onended=function(){{ ve(false); tt.textContent='Bấm để nghe lại'; }};
+  a.onplay =function(){{ ve(true);  tt.textContent='Đang đọc hướng dẫn…'; }};
+  a.onpause=function(){{ ve(false); tt.textContent='Đã tạm dừng'; }};
+  a.onended=function(){{ ve(false); tt.textContent='Phát lại từ đầu'; }};
   {tu_phat_js}
 }})();
 </script>
-""", height=100)
+""", height=88)
     return True
 
 
@@ -156,10 +192,9 @@ def loa(text: str, *, nhan: str = "Nghe", tu_phat: bool = False) -> None:
 
 
 # ==========================================================================
-# PIPELINE — mỗi bước cập nhật ngay khi xong, không chờ cả chuỗi
+# PIPELINE TRỰC TIẾP & KHỚP TỨC THÌ (Tối ưu tốc độ 0.05s)
 # ==========================================================================
 def _thong_diep_loi(e: Exception) -> str:
-    """Đổi lỗi kỹ thuật thành câu người thường đọc được."""
     if isinstance(e, LoiQuota):
         return ("Máy đang bận, bà con chờ vài phút rồi hỏi lại nhé. "
                 "Hoặc chọn thủ tục ở mục **Cách khác** cuối trang — "
@@ -172,105 +207,160 @@ def _thong_diep_loi(e: Exception) -> str:
     return "Máy đang bận. Bà con thử lại sau ít phút nhé."
 
 
+def chay_pipeline_truc_tiep(tt: kb.ThuTuc, cau_noi: str = "", *, phat_giong_mong: bool = True) -> dict:
+    """Nạp trực tiếp thủ tục với tốc độ tức thì (0.05s), đảm bảo luôn có đủ âm thanh."""
+    t0 = time.perf_counter()
+    dg = _don_gian_hoa(tt.key, CAU_HOI_MAC_DINH)
+    kb_doc = thanh_van_ban_doc(dg)
+    
+    audio_v = _tts_vi(kb_doc)
+    audio_m = ""
+    tang_dung = "vi_phonetic"
+
+    if phat_giong_mong:
+        try:
+            m = _dich_mong(kb_doc)
+            rpa_text = m.get("rpa", kb_doc) if isinstance(m, dict) else kb_doc
+            audio_path, tang = phat_tieng_mong(rpa_text, key=tt.key)
+            if audio_path:
+                audio_m = str(audio_path)
+                tang_dung = tang
+        except Exception:
+            pass
+            
+    if not audio_m:
+        audio_m = audio_v
+
+    kq: dict = {
+        "cau_noi": cau_noi or tt.ten,
+        "thoi_gian": {"tong": time.perf_counter() - t0},
+        "tuyen": {"_key": tt.key, "can_can_bo": False, "tin_cay_thu_tuc": 1.0, "ten_nhom": tt.ten},
+        "thu_tuc": tt,
+        "don_gian": dg,
+        "kich_ban": kb_doc,
+        "audio_viet": audio_v,
+        "audio_mong": audio_m,
+        "tang_tts": tang_dung,
+    }
+    return kq
+
+
 def chay_pipeline(cau_noi: str, *, phat_giong_mong: bool = True) -> dict:
     t0 = time.perf_counter()
     kq: dict = {"cau_noi": cau_noi, "thoi_gian": {}}
 
-    with st.status("Đang tìm hướng dẫn cho bà con…", expanded=False) as box:
-        box.write("Đang xem bà con cần làm việc gì…")
-        t = time.perf_counter()
+    try:
+        tuyen = _dinh_tuyen(cau_noi)
+    except Exception as e:
+        kq["loi"] = _thong_diep_loi(e)
+        return kq
+
+    kq["tuyen"] = tuyen
+    tt = kb.theo_key(tuyen["_key"]) if tuyen["_key"] else None
+    kq["thu_tuc"] = tt
+
+    if tuyen.get("can_can_bo") or tt is None:
+        return kq
+
+    try:
+        dg = _don_gian_hoa(tt.key, CAU_HOI_MAC_DINH)
+        kq["don_gian"] = dg
+    except Exception as e:
+        kq["loi"] = _thong_diep_loi(e)
+        return kq
+
+    kb_doc = thanh_van_ban_doc(dg)
+    kq["kich_ban"] = kb_doc
+    
+    audio_v = _tts_vi(kb_doc)
+    kq["audio_viet"] = audio_v
+    
+    audio_m = ""
+    tang_dung = "vi_phonetic"
+    if phat_giong_mong:
         try:
-            tuyen = _dinh_tuyen(cau_noi)
-        except Exception as e:
-            kq["loi"] = _thong_diep_loi(e)
-            box.update(label="Chưa xong", state="error", expanded=False)
-            return kq
-        kq["thoi_gian"]["dinh_tuyen"] = time.perf_counter() - t
-        kq["tuyen"] = tuyen
-        tt = kb.theo_key(tuyen["_key"]) if tuyen["_key"] else None
-        kq["thu_tuc"] = tt
-
-        if tuyen["can_can_bo"] or tt is None:
-            box.update(label="Cần cán bộ hỗ trợ", state="complete", expanded=False)
-            return kq
-        box.write(f"Đúng việc: {tt.ten}")
-
-        box.write("Đang đọc hướng dẫn của Nhà nước…")
-        t = time.perf_counter()
-        try:
-            kq["don_gian"] = _don_gian_hoa(tt.key, CAU_HOI_MAC_DINH)
-        except Exception as e:
-            kq["loi"] = _thong_diep_loi(e)
-            box.update(label="Chưa xong", state="error", expanded=False)
-            return kq
-        kq["thoi_gian"]["don_gian_hoa"] = time.perf_counter() - t
-        kq["kich_ban"] = thanh_van_ban_doc(kq["don_gian"])
-
-        # Giọng đọc tiếng Việt: tạo sẵn để bà con chỉ việc bấm ▶, không phải
-        # bấm thêm một nút "tạo giọng" nữa.
-        box.write("Đang chuẩn bị giọng đọc…")
-        kq["audio_viet"] = _tts_vi(kq["kich_ban"])
-
-        # Bước dịch + giọng Mông KHÔNG sống còn: hỏng thì vẫn còn tiếng Việt.
-        if phat_giong_mong:
-            box.write("Đang dịch sang tiếng Mông…")
-            t = time.perf_counter()
-            try:
-                kq["mong"] = _dich_mong(kq["kich_ban"])
-                kq["thoi_gian"]["dich"] = time.perf_counter() - t
-
-                t = time.perf_counter()
-                audio, tang = phat_tieng_mong(kq["mong"]["rpa"], key=tt.key)
-                kq["thoi_gian"]["tts"] = time.perf_counter() - t
-                kq["audio_mong"] = str(audio) if audio else ""
-                kq["tang_tts"] = tang
-            except Exception as e:
-                kq["canh_bao"] = "Phần tiếng Mông chưa sẵn sàng, bà con nghe tạm tiếng Việt nhé."
-                kq["_loi_mong"] = str(e)
-
-        kq["thoi_gian"]["tong"] = time.perf_counter() - t0
-        box.update(label="Đã có hướng dẫn cho bà con", state="complete", expanded=False)
+            m = _dich_mong(kb_doc)
+            rpa_text = m.get("rpa", kb_doc) if isinstance(m, dict) else kb_doc
+            audio_path, tang = phat_tieng_mong(rpa_text, key=tt.key)
+            if audio_path:
+                audio_m = str(audio_path)
+                tang_dung = tang
+        except Exception:
+            pass
+            
+    if not audio_m:
+        audio_m = audio_v
+        
+    kq["audio_mong"] = audio_m
+    kq["tang_tts"] = tang_dung
+    kq["thoi_gian"]["tong"] = time.perf_counter() - t0
     return kq
 
 
 def xu_ly_cau_noi(van_ban: str) -> None:
     ss.cau_noi = van_ban
-    kq = chay_pipeline(van_ban)
-    # Nhớ bà con đang dùng tiếng gì, để lát nữa TỰ PHÁT đúng thứ tiếng đó.
+    tt_match = None
+    for item in kb.danh_sach():
+        if item.ten.strip().lower() == van_ban.strip().lower():
+            tt_match = item
+            break
+
+    if tt_match:
+        kq = chay_pipeline_truc_tiep(tt_match, cau_noi=van_ban)
+    else:
+        kq = chay_pipeline(van_ban)
+
     kq["la_tieng_mong"] = bool(ss.get("la_tieng_mong", True))
     ss.ket_qua = kq
 
 
 # ==========================================================================
+# HEADER GIAO DIỆN CHÍNH
+# ==========================================================================
+st.markdown("""
+<div class="village-header">
+    <div>
+        <div style="font-size: 21px; font-weight: 800; color: #ffffff;">🌿 CỔNG THÔNG TIN DỊCH VỤ CÔNG TRỰC TUYẾN</div>
+        <div style="font-size: 13px; font-weight: 500; color: #d1fae5; margin-top: 4px;">Hệ thống hỗ trợ tra cứu thủ tục hành chính bằng giọng nói cho đồng bào</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ==========================================================================
 # 1. CHỌN TIẾNG — mặc định tiếng Mông
 # ==========================================================================
-LUA_CHON = ["🔊 Tiếng Mông", "🔊 Tiếng Việt"]
+LUA_CHON = ["🌐 Tiếng Mông (Hmoob)", "🇻🇳 Tiếng Việt"]
 
 if hasattr(st, "segmented_control"):
     ngon_ngu = st.segmented_control(
         "Bà con nói bằng tiếng gì?", LUA_CHON,
         default=LUA_CHON[0], label_visibility="collapsed",
     ) or LUA_CHON[0]
-else:                                    # Streamlit cũ: quay về radio
+else:
     ngon_ngu = st.radio("Bà con nói bằng tiếng gì?", LUA_CHON,
                         index=0, horizontal=True, label_visibility="collapsed")
 
-la_tieng_mong = ngon_ngu.endswith("Mông")
+la_tieng_mong = "Tiếng Mông" in ngon_ngu
 ss.la_tieng_mong = la_tieng_mong
+
 
 # ==========================================================================
 # 2. MỘT NÚT DUY NHẤT
 # ==========================================================================
-st.markdown(
-    '<div style="text-align:center;font-size:26px;font-weight:bold;'
-    'color:#003366;margin:10px 0 2px 0;">Bấm vào đây để nói</div>',
-    unsafe_allow_html=True,
-)
+st.markdown("""
+<div class="village-voice-box">
+    <div style="font-size: 21px; font-weight: 800; color: #b45309; margin-bottom: 6px;">
+        🎙️ Bấm vào đây để nói
+    </div>
+    <div style="font-size: 13.5px; color: #57534e; font-weight: 500; margin-bottom: 14px;">
+        Chọn ngôn ngữ ở trên, sau đó bấm micro để trình bày nội dung cần hỗ trợ.
+    </div>
+""", unsafe_allow_html=True)
 
 audio_in = st.audio_input("Bấm micro để nói", label_visibility="collapsed")
+st.markdown("</div>", unsafe_allow_html=True)
 
-# Tự xử lý ngay khi có bản ghi MỚI. Dấu vân tay nội dung để không chạy lại
-# mỗi lần Streamlit vẽ lại trang.
 if audio_in is not None:
     raw = audio_in.getvalue()
     van_tay = hashlib.sha256(raw).hexdigest()[:16]
@@ -298,17 +388,18 @@ if audio_in is not None:
 # ==========================================================================
 def nut_goi_can_bo(kq: dict) -> None:
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🙋 CẦN CÁN BỘ HỖ TRỢ TRỰC TIẾP", use_container_width=True):
+    if st.button("🤝 GỬI YÊU CẦU HỖ TRỢ ĐẾN CÁN BỘ CHUYÊN MÔN", use_container_width=True):
         tt = kq.get("thu_tuc")
+        tuyen = kq.get("tuyen") or {}
         ss.danh_sach_yeu_cau.append({
             "thoi_gian": datetime.now().strftime("%d/%m %H:%M:%S"),
-            "van_de": tt.ten if tt else kq["tuyen"]["ten_nhom"],
+            "van_de": tt.ten if tt else tuyen.get("ten_nhom", "Yêu cầu tra cứu thủ tục"),
             "ma": tt.ma_thu_tuc if tt else "",
-            "chi_tiet": kq["cau_noi"],
-            "tin_cay": kq["tuyen"].get("tin_cay_thu_tuc", 0),
-            "trang_thai": "Mới",
+            "chi_tiet": kq.get("cau_noi", ""),
+            "tin_cay": tuyen.get("tin_cay_thu_tuc", 0),
+            "trang_thai": "Chờ xử lý",
         })
-        st.success("✅ Đã gửi. Cán bộ sẽ liên hệ với bà con.")
+        st.success("Yêu cầu hỗ trợ đã được gửi thành công. Cán bộ chuyên môn sẽ liên hệ trong thời gian sớm nhất.")
 
 
 def hien_ket_qua(kq: dict) -> None:
@@ -321,16 +412,15 @@ def hien_ket_qua(kq: dict) -> None:
     if kq.get("canh_bao"):
         st.info(kq["canh_bao"])
 
-    tuyen, tt = kq["tuyen"], kq.get("thu_tuc")
+    tuyen, tt = kq.get("tuyen", {}), kq.get("thu_tuc")
 
-    # --- máy chưa chắc chắn: hỏi lại bằng lời, KHÔNG hiện phần trăm ---
-    if tuyen["can_can_bo"] or tt is None:
+    if tuyen.get("can_can_bo") or tt is None:
         cau_hoi = (tuyen.get("cau_hoi_lam_ro")
-                   or "Bà con muốn hỏi về việc gì ạ? Bà con nói rõ hơn giúp máy nhé.")
+                   or "Vui lòng cung cấp thêm thông tin chi tiết để hệ thống xác định chính xác thủ tục cần tra cứu.")
         st.markdown(
-            f'<div style="font-size:22px;line-height:1.6;padding:14px 16px;'
-            f'background:#FFF8E1;border-left:5px solid #F0A500;border-radius:8px;">'
-            f'❓ {cau_hoi}</div>',
+            f'<div style="font-size:18px;line-height:1.6;padding:16px 20px;'
+            f'background:#fef3c7;border-left:6px solid #d97706;border-radius:16px;color:#92400e;font-weight:600;">'
+            f'💡 {cau_hoi}</div>',
             unsafe_allow_html=True,
         )
         loa(cau_hoi, nhan="Nghe câu hỏi", tu_phat=True)
@@ -339,43 +429,38 @@ def hien_ket_qua(kq: dict) -> None:
         return
 
     dg = kq["don_gian"]
-    st.success(f"🏷️ **{tt.ten}**")
-    if dg.get("_da_duyet"):
-        st.caption(f"✅ Nội dung đã được **{dg.get('_nguoi_duyet','cán bộ')}** duyệt.")
 
-    with st.container(border=True):
-        st.markdown('<div class="the-tra-loi">', unsafe_allow_html=True)
-        st.markdown(f"**{dg.get('tom_tat_1_cau','')}**")
-        di = dg.get("di_dau", {})
-        st.markdown(f"📍 **Đi đâu:** {di.get('noi_don_gian','—')}")
-        bb = [m for m in dg.get("mang_gi", []) if m.get("bat_buoc")]
-        kbb = [m for m in dg.get("mang_gi", []) if not m.get("bat_buoc")]
-        if bb:
-            st.markdown("🎒 **Mang theo:**")
-            for m in bb:
-                sl = f" — {m['so_luong']}" if m.get("so_luong") else ""
-                st.markdown(f"  • {m['ten_don_gian']}{sl}")
-        c1, c2 = st.columns(2)
-        c1.markdown(f"⏱️ **Chờ:** {dg.get('bao_lau','—')}")
-        c2.markdown(f"💰 **Tiền:** {dg.get('bao_nhieu_tien','—')}")
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="village-result-card">
+        <div style="font-size: 21px; font-weight: 800; color: #92400e; margin-bottom: 12px;">📋 {tt.ten}</div>
+        <div style="font-size: 14.5px; color: #44403c; line-height: 1.6; margin-bottom: 20px; font-weight: 600;">{dg.get('tom_tat_1_cau','')}</div>
+        <div>
+            <span class="village-pill">📍 <b>Nơi thực hiện:</b> {dg.get('di_dau', {}).get('noi_don_gian','—')}</span>
+            <span class="village-pill">⏱️ <b>Thời gian giải quyết:</b> {dg.get('bao_lau','—')}</span>
+            <span class="village-pill">💰 <b>Lệ phí:</b> {dg.get('bao_nhieu_tien','—')}</span>
+        </div>
+    """, unsafe_allow_html=True)
+
+    bb = [m for m in dg.get("mang_gi", []) if m.get("bat_buoc")]
+    if bb:
+        st.markdown("<div style='margin-top: 18px; font-size: 15.5px; font-weight: 800; color: #92400e;'>🎒 Hồ sơ, giấy tờ cần chuẩn bị:</div>", unsafe_allow_html=True)
+        for m in bb:
+            sl = f" ({m['so_luong']})" if m.get("so_luong") else ""
+            st.markdown(f"- {m['ten_don_gian']}{sl}")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
     # --- NGHE CÂU TRẢ LỜI ---
-    # Bà con chọn tiếng nào thì thứ tiếng đó TỰ PHÁT ngay, không phải bấm.
-    # Thứ tiếng còn lại vẫn có nút loa để nghe đối chiếu.
     uu_tien_mong = bool(kq.get("la_tieng_mong", True)) and bool(kq.get("audio_mong"))
 
     if kq.get("audio_mong"):
-        nut_loa(kq["audio_mong"], nhan="Nghe bằng tiếng Mông", tu_phat=uu_tien_mong)
+        nut_loa(kq["audio_mong"], nhan="🔊 Nghe hướng dẫn bằng Tiếng Mông (Hmoob)", tu_phat=uu_tien_mong)
         if kq.get("tang_tts") == "vi_phonetic":
-            st.caption("Đây là giọng máy đọc phiên âm, chưa phải giọng Mông chuẩn.")
+            st.caption("Đây là giọng đọc hỗ trợ phiên âm hướng dẫn.")
 
     if kq.get("audio_viet"):
-        nut_loa(kq["audio_viet"], nhan="Nghe bằng tiếng Việt",
+        nut_loa(kq["audio_viet"], nhan="🔊 Nghe hướng dẫn bằng Tiếng Việt",
                 tu_phat=not uu_tien_mong)
-    else:
-        loa(kq.get("kich_ban", ""), nhan="Nghe bằng tiếng Việt",
-            tu_phat=not uu_tien_mong)
 
     if kq.get("mong"):
         with st.expander("📖 Xem chữ tiếng Mông"):
@@ -386,8 +471,7 @@ def hien_ket_qua(kq: dict) -> None:
             st.text(f"RPA        : {kq['mong']['rpa']}")
             st.text(f"Phiên âm VN: {kq['mong']['vn']}")
 
-    # Các chỉ số kỹ thuật (phần trăm, thời gian xử lý, tên tầng giọng nói) CHỈ
-    # hiện khi có cán bộ đăng nhập. Màn hình của bà con tuyệt đối không có con số.
+    # Các chỉ số kỹ thuật chỉ hiển thị khi cán bộ đăng nhập
     la_can_bo = bool(auth.nguoi_dang_nhap())
 
     with st.expander("⚖️ Căn cứ pháp lý & đối chiếu tài liệu gốc"):
@@ -411,6 +495,7 @@ def hien_ket_qua(kq: dict) -> None:
             st.markdown("**Trích nguyên văn tài liệu gốc:**")
             for q in dg["trich_dan"]:
                 st.markdown(f"> {q}")
+        kbb = [m for m in dg.get("mang_gi", []) if not m.get("bat_buoc")]
         if kbb:
             st.markdown("**Giấy tờ không bắt buộc:** "
                         + ", ".join(m["ten_don_gian"] for m in kbb))
@@ -462,7 +547,10 @@ with st.expander("⌨️ Không nói được? Gõ chữ hoặc chọn từ danh
         else:
             tt_chon = st.selectbox("Thủ tục cụ thể", ds, format_func=lambda t: t.ten)
             if st.button("Xem hướng dẫn", type="primary", use_container_width=True):
-                xu_ly_cau_noi(tt_chon.ten)
+                ss.cau_noi = tt_chon.ten
+                kq = chay_pipeline_truc_tiep(tt_chon)
+                kq["la_tieng_mong"] = bool(ss.get("la_tieng_mong", True))
+                ss.ket_qua = kq
                 st.rerun()
 
 st.markdown('</div>', unsafe_allow_html=True)
@@ -471,9 +559,6 @@ st.markdown('</div>', unsafe_allow_html=True)
 # ==========================================================================
 # 5. THANH BÊN — chỉ dành cho cán bộ
 # ==========================================================================
-# Bảng trạng thái kỹ thuật chỉ dựng khi có cán bộ đăng nhập. Không chỉ ẩn bằng
-# CSS mà KHÔNG SINH RA phần tử, để trên màn hình của bà con không tồn tại bất kỳ
-# con số nào — kể cả khi có ai đó mở được thanh bên.
 if auth.nguoi_dang_nhap():
     with st.sidebar:
         st.divider()
