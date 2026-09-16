@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Cổng người dân — hỏi đáp thủ tục bằng giọng nói (Giao diện thân thiện vùng cao, siêu tốc 0.05s)."""
+"""Cổng người dân — Giao diện đậm chất bản làng vùng cao, siêu tốc 0.05s, giữ nguyên 100% tính năng."""
 from __future__ import annotations
 
 import base64
@@ -28,7 +28,7 @@ ss.setdefault("cau_noi", "")
 ss.setdefault("audio_da_xu_ly", "")
 ss.setdefault("la_tieng_mong", True)
 
-# Giao diện đậm chất vùng cao: Tông xanh đại ngàn (#1b4d3e), vàng nắng bản (#f59e0b) và cam đất nung (#b45309)
+# Giao diện đậm chất bản làng vùng cao: Hơi thở núi rừng, ấm áp, thân thiện
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
@@ -37,44 +37,46 @@ st.markdown("""
     html, body, [class*="css"] {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
         color: #2c221e;
-        background: linear-gradient(180deg, #fefcf7 0%, #f4ede2 100%);
+        background: linear-gradient(180deg, #fdfbf7 0%, #f4ede2 100%);
     }
-    .block-container { padding-top: 1.8rem; padding-bottom: 5rem; max-width: 860px; }
+    .block-container { padding-top: 1.5rem; padding-bottom: 5rem; max-width: 860px; }
     
-    /* Tiêu đề chính đậm chất bản làng */
+    /* Header phong cách bản làng đại ngàn */
     .village-header {
-        background: linear-gradient(135deg, #1b4d3e 0%, #113227 100%);
-        color: white; border-radius: 24px; padding: 28px 34px; display: flex;
-        align-items: center; justify-content: space-between; margin-bottom: 22px;
-        box-shadow: 0 14px 30px -10px rgba(27, 77, 62, 0.35);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: linear-gradient(135deg, #1b4d3e 0%, #0f2d24 100%);
+        color: white; border-radius: 24px; padding: 26px 32px; display: flex;
+        align-items: center; justify-content: space-between; margin-bottom: 20px;
+        box-shadow: 0 12px 28px -10px rgba(27, 77, 62, 0.4);
+        border: 2px solid #2e6f5d;
     }
     
-    /* Hộp ghi âm giọng nói */
+    /* Hộp micro giọng nói ấm cúng như nhà sàn */
     .village-voice-box {
-        background: #ffffff; border: 2px solid #e7dfd3; border-radius: 28px;
-        padding: 32px; box-shadow: 0 10px 25px -8px rgba(44, 34, 30, 0.06);
-        margin-bottom: 24px; text-align: center;
+        background: #fffdf9; border: 3px dashed #d97706; border-radius: 28px;
+        padding: 30px; box-shadow: 0 10px 25px -8px rgba(180, 83, 9, 0.12);
+        margin-bottom: 22px; text-align: center;
     }
     
-    /* Thẻ kết quả tra cứu */
+    /* Thẻ kết quả sắc nét, nổi bật thông tin */
     .village-result-card {
         background: #ffffff; border: 2px solid #e7dfd3; border-radius: 28px;
         padding: 32px; box-shadow: 0 12px 30px -10px rgba(44, 34, 30, 0.08); margin-top: 20px;
+        border-left: 8px solid #b45309;
     }
     
-    /* Nhãn thông tin (pill) thân thiện */
+    /* Nhãn thông tin bản làng (pill vàng nắng lúa) */
     .village-pill {
         display: inline-flex; align-items: center; gap: 6px; background: #fef3c7;
         padding: 8px 16px; border-radius: 14px; font-size: 13.5px; font-weight: 700;
         color: #92400e; margin-right: 8px; margin-bottom: 8px; border: 1px solid #fde68a;
+        box-shadow: 0 2px 5px rgba(217, 119, 6, 0.08);
     }
     
-    /* Nút bấm tổng quát */
+    /* Nút bấm thổ cẩm đất nung */
     .stButton > button {
-        border-radius: 16px; font-weight: 700; padding: 0.7rem 1.5rem;
+        border-radius: 16px; font-weight: 700; padding: 0.75rem 1.6rem;
         border: none; background: #b45309; color: white;
-        box-shadow: 0 4px 12px rgba(180, 83, 9, 0.25);
+        box-shadow: 0 4px 12px rgba(180, 83, 9, 0.3);
         transition: all 0.2s ease;
     }
     .stButton > button:hover { background: #92400e; transform: translateY(-1px); }
@@ -140,7 +142,7 @@ _SVG_DUNG = ('<svg width="24" height="24" viewBox="0 0 24 24" fill="white">'
 
 
 def nut_loa(duong_dan, *, nhan: str, tu_phat: bool = False) -> bool:
-    """Nút loa tròn màu cam đất nung ấm áp, thân thiện cho người lớn tuổi, tự phát khi có kết quả."""
+    """Nút loa tròn lớn thân thiện cho bà con vùng cao, tự phát khi có kết quả."""
     if not duong_dan:
         return False
     b64, mime = _audio_b64(str(duong_dan))
@@ -150,15 +152,15 @@ def nut_loa(duong_dan, *, nhan: str, tu_phat: bool = False) -> bool:
     tu_phat_js = ("a.play().then(function(){}).catch(function(){"
                   "tt.textContent='Bấm vào loa để nghe';});") if tu_phat else ""
     _html(f"""
-<div style="display:flex;align-items:center;gap:16px;background:#fffbeb;border:1px solid #fde68a;border-radius:20px;padding:14px 20px;margin:12px 0;box-shadow:0 4px 12px rgba(180,83,9,0.06);">
+<div style="display:flex;align-items:center;gap:16px;background:#fffbeb;border:2px solid #fde68a;border-radius:20px;padding:14px 20px;margin:12px 0;box-shadow:0 4px 12px rgba(180,83,9,0.08);">
   <button id="b" aria-label="Nghe" style="
-      width:56px;height:56px;min-width:56px;border-radius:50%;border:none;
+      width:58px;height:58px;min-width:58px;border-radius:50%;border:none;
       background:#b45309;cursor:pointer;display:flex;align-items:center;
-      justify-content:center;box-shadow:0 4px 12px rgba(180,83,9,0.3);
+      justify-content:center;box-shadow:0 4px 14px rgba(180,83,9,0.35);
       transition:transform 0.15s;"></button>
   <div style="flex-grow:1;">
-    <div style="font-size:16px;font-weight:800;color:#92400e;">{nhan}</div>
-    <div id="tt" style="font-size:12px;color:#b45309;margin-top:2px;font-weight:600;">Bấm để nghe hướng dẫn</div>
+    <div style="font-size:16.5px;font-weight:800;color:#92400e;">{nhan}</div>
+    <div id="tt" style="font-size:12.5px;color:#b45309;margin-top:2px;font-weight:600;">Bấm vào loa để nghe tiếng đọc</div>
   </div>
   <audio id="a" src="data:{mime};base64,{b64}" preload="auto"></audio>
 </div>
@@ -320,8 +322,8 @@ def xu_ly_cau_noi(van_ban: str) -> None:
 st.markdown("""
 <div class="village-header">
     <div>
-        <div style="font-size: 21px; font-weight: 800; color: #ffffff;">🌿 CỔNG THÔNG TIN DỊCH VỤ CÔNG TRỰC TUYẾN</div>
-        <div style="font-size: 13px; font-weight: 500; color: #d1fae5; margin-top: 4px;">Hệ thống hỗ trợ tra cứu thủ tục hành chính bằng giọng nói cho đồng bào</div>
+        <div style="font-size: 22px; font-weight: 800; color: #ffffff;">🏡 CỔNG THÔNG TIN DỊCH VỤ CÔNG BẢN LÀNG</div>
+        <div style="font-size: 13px; font-weight: 500; color: #d1fae5; margin-top: 4px;">Hệ thống hỗ trợ tra cứu thủ tục hành chính bằng giọng nói cho đồng bào vùng cao</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -351,10 +353,10 @@ ss.la_tieng_mong = la_tieng_mong
 st.markdown("""
 <div class="village-voice-box">
     <div style="font-size: 21px; font-weight: 800; color: #b45309; margin-bottom: 6px;">
-        🎙️ Bấm vào đây để nói
+        🎙️ Bấm vào đây để nói câu hỏi
     </div>
     <div style="font-size: 13.5px; color: #57534e; font-weight: 500; margin-bottom: 14px;">
-        Chọn ngôn ngữ ở trên, sau đó bấm micro để trình bày nội dung cần hỗ trợ.
+        Chọn ngôn ngữ phía trên, sau đó bấm vào micro để trình bày việc cần giúp đỡ.
     </div>
 """, unsafe_allow_html=True)
 
@@ -432,7 +434,7 @@ def hien_ket_qua(kq: dict) -> None:
 
     st.markdown(f"""
     <div class="village-result-card">
-        <div style="font-size: 21px; font-weight: 800; color: #92400e; margin-bottom: 12px;">📋 {tt.ten}</div>
+        <div style="font-size: 21.5px; font-weight: 800; color: #92400e; margin-bottom: 12px;">📋 {tt.ten}</div>
         <div style="font-size: 14.5px; color: #44403c; line-height: 1.6; margin-bottom: 20px; font-weight: 600;">{dg.get('tom_tat_1_cau','')}</div>
         <div>
             <span class="village-pill">📍 <b>Nơi thực hiện:</b> {dg.get('di_dau', {}).get('noi_don_gian','—')}</span>
